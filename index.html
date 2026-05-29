@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>「ARCH」 2048 PROTOCOL</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@300;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #000000;
+      --accent: #ffffff;
+      --dim: rgba(255,255,255,0.4);
+      --dimmer: rgba(255,255,255,0.1);
+      var(--font): 'Orbitron', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; cursor: none !important; }
+    ::-webkit-scrollbar { width: 2px; height: 2px; }
+    ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.3); }
+
+    body {
+      background: #000;
+      color: #fff;
+      font-family: var(--font);
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    /* ── CURSOR ── */
+    #cursor {
+      position: fixed; width: 32px; height: 32px;
+      border: 1px solid #fff; border-radius: 50%;
+      pointer-events: none; transform: translate(-50%, -50%);
+      z-index: 99999; transition: width .1s, height .1s, box-shadow .1s;
+      box-shadow: 0 0 12px rgba(255,255,255,.4);
+    }
+    #cursor::before, #cursor::after {
+      content: ''; position: absolute; background: #fff;
+    }
+    #cursor::before { top: 50%; left: -5px; right: -5px; height: 1px; }
+    #cursor::after  { left: 50%; top: -5px; bottom: -5px; width: 1px; }
+    #cursor.click { width: 14px !important; height: 14px !important; box-shadow: 0 0 25px #fff !important; }
+
+    @media (pointer: coarse) {
+      #cursor { display: none !important; }
+      * { cursor: auto !important; }
+    }
+
+    /* ── SCANLINE ── */
+    .scanline {
+      position: fixed; inset: 0;
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,.018) 2px, rgba(255,255,255,.018) 4px);
+      pointer-events: none; z-index: 9000;
+    }
+
+    @keyframes glitch {
+      0%   { transform: translate(0); }
+      20%  { transform: translate(-2px,1px); }
+      40%  { transform: translate(-1px,-1px); }
+      60%  { transform: translate(2px,1px); }
+      80%  { transform: translate(1px,-1px); }
+      100% { transform: translate(0); }
+    }
+
+    /* ── HEADER ── */
+    header {
+      position: fixed; top: 0; left: 0; right: 0; height: 58px;
+      border-bottom: 1px solid rgba(255,255,255,.25);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 32px; background: rgba(0,0,0,.96);
+      z-index: 500; box-shadow: 0 0 30px rgba(255,255,255,.06);
+    }
+    .hdr-left { display: flex; align-items: center; gap: 14px; }
+    .hdr-title { font-size: 19px; font-weight: 900; letter-spacing: 3px; text-shadow: 0 0 18px rgba(255,255,255,.6); }
+    .hdr-sub   { font-size: 10px; letter-spacing: 5px; color: var(--dim); }
+    .hdr-right { font-size: 10px; color: rgba(255,255,255,.5); font-family: monospace; letter-spacing: 2px; text-align: right; line-height: 1.7; }
+    .hdr-right span { color: #fff; }
+
+    /* ── LAYOUT ── */
+    #app {
+      margin-top: 58px; height: calc(100vh - 58px);
+      display: flex; align-items: stretch; justify-content: center;
+      gap: 12px; padding: 14px 10px;
+    }
+
+    /* ── SIDE PANELS ── */
+    .side { width: 210px; height: 100%; display: flex; flex-direction: column; gap: 10px; overflow-y: auto; flex-shrink: 0; }
+
+    .box {
+      border: 1px solid rgba(255,255,255,.18);
+      background: rgba(255,255,255,.025);
+      padding: 14px 16px; position: relative;
+    }
+    .box::after {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.5), transparent);
+    }
+    .box-label { font-size: 8px; letter-spacing: 4px; color: rgba(255,255,255,.4); margin-bottom: 8px; }
+    .box-val { font-size: 30px; font-weight: 900; text-shadow: 0 0 18px rgba(255,255,255,.6); }
+    .box-val.sm { font-size: 20px; }
+
+    /* Target preview */
+    #next-wrap { display: flex; align-items: center; justify-content: center; padding: 6px 0 2px; }
+    #next-canvas { border-radius: 8px; border: 1px solid rgba(255,255,255,.3); box-shadow: 0 0 14px rgba(255,255,255,.12); }
+
+    /* How to play */
+    .howto { font-size: 10px; line-height: 2; color: rgba(255,255,255,.55); }
+    .howto b { color: #fff; font-family: var(--font); font-size: 9px; }
+
+    /* Char list */
+    #char-list { display: flex; flex-direction: column; gap: 3px; }
+    .crow {
+      display: flex; align-items: center; gap: 8px;
+      padding: 4px 6px; border: 1px solid transparent;
+      transition: all .2s;
+    }
+    .crow.on  { border-color: rgba(255,255,255,.15); }
+    .crow.cur { border-color: rgba(255,255,255,.8); box-shadow: 0 0 8px rgba(255,255,255,.25); background: rgba(255,255,255,.05); }
+    .cimg {
+      width: 26px; height: 26px; border-radius: 4px; object-fit: cover;
+      border: 1px solid rgba(255,255,255,.2);
+      transition: filter .3s;
+    }
+    .crow:not(.on) .cimg { filter: brightness(0); }
+    .crow:not(.on) .cname { color: rgba(255,255,255,.2); }
+    .crow:not(.on) .cpts  { color: rgba(255,255,255,.1); }
+    .cname { font-size: 8px; letter-spacing: 1px; color: rgba(255,255,255,.7); }
+    .cpts  { font-size: 7px; color: rgba(255,255,255,.35); }
+
+    /* ── GAME CANVAS ── */
+    #game-wrap { 
+      position: relative; 
+      flex-shrink: 0; 
+      display: flex; 
+      justify-content: center; 
+      align-items: center; 
+    }
+    #gc {
+      display: block;
+      width: 100%;
+      max-width: 380px;
+      height: auto;
+      aspect-ratio: 1 / 1; /* 2048은 정사각형 비율 */
+      object-fit: contain;
+      touch-action: none; 
+      border: 1px solid rgba(255,255,255,.45);
+      box-shadow: 0 0 35px rgba(255,255,255,.07), inset 0 0 50px rgba(0,0,0,.6);
+      border-radius: 8px;
+    }
+
+    /* Game over overlay */
+    #go-overlay {
+      position: absolute; inset: 0;
+      background: rgba(0,0,0,.93);
+      display: none; flex-direction: column;
+      align-items: center; justify-content: center;
+      gap: 18px; border: 1px solid rgba(255,255,255,.6);
+      backdrop-filter: blur(4px);
+      border-radius: 8px;
+    }
+    #go-overlay.on { display: flex; }
+    .go-title { font-size: 22px; font-weight: 900; letter-spacing: 6px; text-shadow: 0 0 25px #fff; animation: glitch .15s infinite; text-align: center; }
+    .go-sub   { font-size: 9px;  letter-spacing: 4px; color: rgba(255,255,255,.5); text-align: center; }
+    .go-score { font-size: 12px; letter-spacing: 3px; color: rgba(255,255,255,.6); text-align: center; }
+    .go-score span { color: #fff; font-size: 22px; font-weight: 900; display: block; margin-top: 4px; text-shadow: 0 0 15px #fff; }
+    .btn-r {
+      padding: 11px 32px; background: transparent;
+      border: 1px solid #fff; color: #fff;
+      font-family: var(--font); font-size: 10px; letter-spacing: 4px;
+      font-weight: 700; transition: .25s; position: relative; overflow: hidden;
+    }
+    .btn-r::before {
+      content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.4), transparent);
+      transition: .4s;
+    }
+    .btn-r:hover { background: #fff; color: #000; box-shadow: 0 0 22px #fff; }
+    .btn-r:hover::before { left: 100%; }
+
+    /* ── NOTIFICATION ── */
+    #notif {
+      position: fixed; bottom: 22px; right: 22px;
+      background: rgba(255,255,255,.95); color: #000;
+      padding: 11px 18px; font-size: 10px; font-weight: 900;
+      letter-spacing: 1px; display: none; z-index: 11000;
+      border-left: 4px solid #000; max-width: 340px;
+      box-shadow: 0 8px 28px rgba(255,255,255,.15);
+    }
+    @keyframes notifIn { from { transform: translateX(110%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    /* ── SCORE POP ── */
+    .score-pop {
+      position: absolute; font-size: 13px; font-weight: 900;
+      color: #fff; text-shadow: 0 0 12px #fff; pointer-events: none;
+      animation: popUp .8s ease forwards; z-index: 100;
+      font-family: var(--font); letter-spacing: 2px;
+    }
+    @keyframes popUp {
+      0%   { transform: translateY(0); opacity: 1; }
+      100% { transform: translateY(-50px); opacity: 0; }
+    }
+    
+    /* ── CAPTURE BUTTON ── */
+    #capture-btn {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 14px 20px; background: transparent;
+      border: 1px solid rgba(255,255,255,.5); color: rgba(255,255,255,.7);
+      font-family: var(--font); font-size: 9px; letter-spacing: 3px; font-weight: 700;
+      transition: .25s; position: relative; overflow: hidden;
+      box-shadow: 0 0 10px rgba(255,255,255,.05);
+    }
+    #capture-btn::before {
+      content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,.35), transparent);
+      transition: .4s;
+    }
+    #capture-btn:hover { background: #fff; color: #000; border-color: #fff; box-shadow: 0 0 22px rgba(255,255,255,.5); }
+    #capture-btn:hover::before { left: 100%; }
+    #capture-btn.capturing { pointer-events: none; opacity: .5; }
+    .cam-icon { font-size: 13px; line-height: 1; }
+
+    /* Flash overlay */
+    #flash {
+      position: fixed; inset: 0; background: #fff;
+      opacity: 0; pointer-events: none; z-index: 99999;
+      transition: opacity .08s ease;
+    }
+    #flash.on { opacity: 0.7; }
+
+    /* Share modal */
+    #share-modal {
+      position: fixed; inset: 0; background: rgba(0,0,0,.88);
+      z-index: 50000; display: none; align-items: center; justify-content: center;
+      backdrop-filter: blur(6px);
+    }
+    #share-modal.on { display: flex; }
+    .share-box {
+      border: 1px solid rgba(255,255,255,.5);
+      background: #000; padding: 28px 28px 22px;
+      display: flex; flex-direction: column; align-items: center; gap: 16px;
+      max-width: 440px; width: 90%;
+      box-shadow: 0 0 50px rgba(255,255,255,.08);
+      position: relative;
+    }
+    .share-box::before {
+      content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, #fff, transparent);
+    }
+    .share-label { font-size: 9px; letter-spacing: 4px; color: rgba(255,255,255,.5); text-align: center; }
+    .share-title { font-size: 16px; font-weight: 900; letter-spacing: 4px; text-shadow: 0 0 15px rgba(255,255,255,.6); text-align: center; }
+    #share-preview {
+      width: 100%; border: 1px solid rgba(255,255,255,.2);
+      box-shadow: 0 0 20px rgba(255,255,255,.06);
+      border-radius: 2px;
+    }
+    .share-btns { display: flex; gap: 10px; width: 100%; }
+    .share-btn {
+      flex: 1; padding: 11px 0; background: transparent;
+      border: 1px solid rgba(255,255,255,.4); color: rgba(255,255,255,.8);
+      font-family: var(--font); font-size: 9px; letter-spacing: 3px; font-weight: 700;
+      transition: .2s; position: relative; overflow: hidden;
+    }
+    .share-btn.primary { border-color: #fff; color: #fff; box-shadow: 0 0 12px rgba(255,255,255,.15); }
+    .share-btn:hover { background: #fff; color: #000; box-shadow: 0 0 20px #fff; }
+    .share-close {
+      font-size: 9px; letter-spacing: 3px; color: rgba(255,255,255,.3);
+      border: none; background: transparent; font-family: var(--font);
+      transition: color .2s; padding: 4px 12px;
+    }
+    .share-close:hover { color: #fff; }
+
+    /* ── MOBILE RESPONSIVE LAYOUT ── */
+    @media (max-width: 900px) {
+      body { overflow-y: auto; overflow-x: hidden; }
+      header { padding: 0 15px; }
+      .hdr-title { font-size: 15px; }
+      .hdr-sub { display: none; }
+      
+      #app {
+        flex-direction: column;
+        height: auto;
+        padding-bottom: 40px;
+        gap: 15px;
+      }
+
+      .side { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; overflow-y: visible; }
+      
+      #side-left { order: 1; grid-template-columns: 1fr 1fr 1fr; }
+      #game-wrap { order: 2; width: 100%; margin: 0 auto; }
+      #side-right { order: 3; display: flex; flex-direction: column; }
+
+      .box-score { grid-column: 1; }
+      .box-best { grid-column: 2; }
+      .box-next { grid-column: 3; display: flex; flex-direction: column; align-items: center; padding: 8px; }
+      #next-wrap { padding: 2px 0; }
+      #next-canvas { width: 44px; height: 44px; }
+
+      .box-capture { grid-column: 1 / -1; }
+      .box-howto { grid-column: 1 / -1; }
+
+      .box-val { font-size: 20px; }
+      .box-val.sm { font-size: 16px; }
+
+      #char-list { flex-direction: row; flex-wrap: wrap; justify-content: center; }
+      .crow { flex: 1 1 30%; min-width: 90px; }
+      
+      #sys-log { max-height: 150px; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="cursor"></div>
+<div class="scanline"></div>
+<div id="notif"></div>
+<div id="flash"></div>
+
+<div id="share-modal">
+  <div class="share-box">
+    <div class="share-label">SCORE_RECORD_CAPTURED</div>
+    <div class="share-title">「ARCH」 2048 PROTOCOL</div>
+    <img id="share-preview" src="" alt="capture">
+    <div class="share-btns">
+      <button class="share-btn primary" onclick="downloadCapture()">[ DOWNLOAD ]</button>
+      <button class="share-btn" onclick="shareCapture()" id="share-native-btn">[ SHARE ]</button>
+    </div>
+    <button class="share-close" onclick="closeShareModal()">[ CLOSE ]</button>
+  </div>
+</div>
+
+<header>
+  <div class="hdr-left">
+    <div class="hdr-title">「ARCH」</div>
+    <div class="hdr-sub">| 2048_PROTOCOL</div>
+  </div>
+  <div class="hdr-right">
+    SYSTEM: <span>ONLINE</span><br>
+    <span id="clock">00:00:00</span> KST
+  </div>
+</header>
+
+<div id="app">
+
+  <div class="side" id="side-left">
+    <div class="box box-score">
+      <div class="box-label">SCORE</div>
+      <div class="box-val" id="score-disp">0</div>
+    </div>
+    <div class="box box-best">
+      <div class="box-label">BEST</div>
+      <div class="box-val sm" id="best-disp">0</div>
+    </div>
+    <div class="box box-next">
+      <div class="box-label">TARGET</div>
+      <div id="next-wrap">
+        <canvas id="next-canvas" width="72" height="72"></canvas>
+      </div>
+    </div>
+    <button id="capture-btn" class="box-capture" onclick="captureScreen()">
+      <span class="cam-icon">⊡</span> CAPTURE_SCORE
+    </button>
+    <div class="box box-howto">
+      <div class="box-label">HOW TO PLAY</div>
+      <div class="howto">
+        <b>SWIPE / ARROW KEYS</b> — 유닛 이동<br>
+        <b>SAME × 2</b> — 상위 유닛으로 자동 합성<br>
+        <b>GRID FULL</b> — 더 이상 이동 불가 시 종료
+      </div>
+    </div>
+  </div>
+
+  <div id="game-wrap">
+    <canvas id="gc"></canvas>
+    <div id="go-overlay">
+      <div class="go-title">GRID_DEADLOCK</div>
+      <div class="go-sub">FUSION_PROTOCOL_TERMINATED</div>
+      <div class="go-score">FINAL_SCORE<span id="final-score">0</span></div>
+      <button class="btn-r" onclick="restartGame()">[ REINITIALIZE ]</button>
+    </div>
+  </div>
+
+  <div class="side" id="side-right">
+    <div class="box box-db" style="flex:1; overflow-y:auto;">
+      <div class="box-label">UNIT DATABASE</div>
+      <div id="char-list"></div>
+    </div>
+    <div class="box box-log">
+      <div class="box-label">SYSTEM LOG</div>
+      <div id="sys-log" style="font-size:9px; color:rgba(255,255,255,.4); font-family:monospace; line-height:1.9; max-height:120px; overflow-y:auto; word-break: break-all;"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  「ARCH」 2048 PROTOCOL — GAME ENGINE
+// ═══════════════════════════════════════════
+
+// ── CONFIG ──
+// 2048 타일 설정 (id: 1~11 이 2~2048 에 대응)
+const UNITS = [
+  { id:1,  img:'A1.png',  val:2,    pts:2,    name:'LEVEL_01' },
+  { id:2,  img:'A2.png',  val:4,    pts:4,    name:'LEVEL_02' },
+  { id:3,  img:'A3.png',  val:8,    pts:8,    name:'LEVEL_03' },
+  { id:4,  img:'A4.png',  val:16,   pts:16,   name:'LEVEL_04' },
+  { id:5,  img:'A5.png',  val:32,   pts:32,   name:'LEVEL_05' },
+  { id:6,  img:'A6.png',  val:64,   pts:64,   name:'LEVEL_06' },
+  { id:7,  img:'A7.png',  val:128,  pts:128,  name:'LEVEL_07' },
+  { id:8,  img:'A8.png',  val:256,  pts:256,  name:'LEVEL_08' },
+  { id:9,  img:'A9.png',  val:512,  pts:512,  name:'LEVEL_09' },
+  { id:10, img:'A10.png', val:1024, pts:1024, name:'LEVEL_10' },
+  { id:11, img:'A11.png', val:2048, pts:2048, name:'PROTOCOL_ARCH' },
+];
+
+const SIZE = 4;
+const CW = 380, CH = 380; // 1:1 비율 정사각형
+const PAD = 10;
+const GAP = 8;
+const CELL = (CW - PAD*2 - GAP*(SIZE-1)) / SIZE;
+
+// ── IMAGE LOADER ──
+const imgs = {};
+let loadedCount = 0;
+
+function loadImages(cb) {
+  UNITS.forEach(u => {
+    const img = new Image();
+    img.onload = img.onerror = () => { if (++loadedCount >= UNITS.length) cb(); };
+    img.src = u.img;
+    imgs[u.id] = img;
+  });
+}
+
+// ── STATE ──
+let grid = [];      // 4x4 배열, 각 셀은 객체 { id, val } 또는 null
+let animTiles = []; // 애니메이션 렌더링용 배열
+let score = 0;
+let bestScore = +(localStorage.getItem('arch_2048_best') || 0);
+let gameOver = false;
+let isAnimating = false;
+let unlocked = new Set([1]); // 최초엔 레벨1(숫자2)만 오픈됨
+
+// ── CANVAS ──
+const canvas = document.getElementById('gc');
+canvas.width = CW; canvas.height = CH;
+const ctx = canvas.getContext('2d');
+
+// ── ENGINE LOGIC ──
+function initGrid() {
+  grid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+  animTiles = [];
+  score = 0;
+  unlocked = new Set([1]);
+  spawnTile();
+  spawnTile();
+  updateUI();
+  syncAnimTiles();
+}
+
+// 랜덤 빈 칸 가져오기
+function getEmptyCells() {
+  let cells = [];
+  for(let r=0; r<SIZE; r++) {
+    for(let c=0; c<SIZE; c++) {
+      if(!grid[r][c]) cells.push({r, c});
+    }
+  }
+  return cells;
+}
+
+// 새 타일 생성 (90% 확률로 2, 10% 확률로 4)
+function spawnTile() {
+  const cells = getEmptyCells();
+  if(cells.length === 0) return;
+  const {r, c} = cells[Math.floor(Math.random() * cells.length)];
+  const id = Math.random() < 0.9 ? 1 : 2;
+  const val = UNITS[id-1].val;
+  grid[r][c] = { id, val };
+  unlocked.add(id);
+  
+  // 애니메이션 객체 추가 (스케일 업 효과용)
+  animTiles.push({ r, c, id, val, targetR: r, targetC: c, scale: 0, merged: false });
+}
+
+// 이동 가능 여부 체크
+function checkGameOver() {
+  if (getEmptyCells().length > 0) return false;
+  for (let r=0; r<SIZE; r++) {
+    for (let c=0; c<SIZE; c++) {
+      const curr = grid[r][c].id;
+      if (r < SIZE-1 && grid[r+1][c].id === curr) return false;
+      if (c < SIZE-1 && grid[r][c+1].id === curr) return false;
+    }
+  }
+  return true;
+}
+
+// 그리드 상태를 렌더 배열에 동기화
+function syncAnimTiles() {
+  animTiles.forEach(t => { t.r = t.targetR; t.c = t.targetC; t.scale = 1; t.merged = false; });
+}
+
+function spawnScorePop(r, c, text) {
+  const el = document.createElement('div');
+  el.className = 'score-pop';
+  el.textContent = text;
+  const rect = canvas.getBoundingClientRect();
+  const scale = rect.width / canvas.width;
+  
+  const px = PAD + c*(CELL+GAP) + CELL/2;
+  const py = PAD + r*(CELL+GAP) + CELL/2;
+  
+  el.style.left = (rect.left + px * scale) + 'px';
+  el.style.top  = (rect.top + py * scale - 10) + 'px';
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 850);
+}
+
+// 이동 로직
+function slide(dirX, dirY) {
+  if (gameOver || isAnimating) return;
+  syncAnimTiles();
+
+  let moved = false;
+  let newGrid = Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+  let mergedFlags = Array.from({ length: SIZE }, () => Array(SIZE).fill(false));
+
+  const traverseR = dirY === 1 ? [3,2,1,0] : [0,1,2,3];
+  const traverseC = dirX === 1 ? [3,2,1,0] : [0,1,2,3];
+
+  traverseR.forEach(r => {
+    traverseC.forEach(c => {
+      if (grid[r][c]) {
+        let curr = grid[r][c];
+        let currR = r;
+        let currC = c;
+        let nextR = currR + dirY;
+        let nextC = currC + dirX;
+
+        // 끝까지 밀기
+        while (nextR >= 0 && nextR < SIZE && nextC >= 0 && nextC < SIZE && !newGrid[nextR][nextC]) {
+          currR = nextR;
+          currC = nextC;
+          nextR += dirY;
+          nextC += dirX;
+        }
+
+        // 합치기 조건 확인
+        if (nextR >= 0 && nextR < SIZE && nextC >= 0 && nextC < SIZE && 
+            newGrid[nextR][nextC] && newGrid[nextR][nextC].id === curr.id && 
+            !mergedFlags[nextR][nextC] && curr.id < 11) {
+          
+          let target = newGrid[nextR][nextC];
+          let nextId = curr.id + 1;
+          let nextVal = UNITS[nextId-1].val;
+          let pts = UNITS[nextId-1].pts;
+
+          newGrid[nextR][nextC] = { id: nextId, val: nextVal };
+          mergedFlags[nextR][nextC] = true;
+          
+          score += pts;
+          unlocked.add(nextId);
+          moved = true;
+
+          // 기존 타일들이 이동하는 애니메이션
+          let animT = animTiles.find(t => t.targetR === r && t.targetC === c);
+          if (animT) { animT.targetR = nextR; animT.targetC = nextC; }
+          
+          // 머지 이펙트를 위한 새 객체
+          animTiles.push({ r: nextR, c: nextC, id: nextId, val: nextVal, targetR: nextR, targetC: nextC, scale: 0.5, merged: true });
+          
+          spawnScorePop(nextR, nextC, `+${pts}`);
+          addLog(`MERGE: ${UNITS[curr.id-1].val} + ${UNITS[curr.id-1].val} → ${nextVal}`);
+          notify(`FUSION: LV${curr.id} → LV${nextId}`);
+        } else {
+          newGrid[currR][currC] = curr;
+          if (currR !== r || currC !== c) moved = true;
+          
+          let animT = animTiles.find(t => t.targetR === r && t.targetC === c);
+          if (animT) { animT.targetR = currR; animT.targetC = currC; }
+        }
+      }
+    });
+  });
+
+  if (moved) {
+    grid = newGrid;
+    isAnimating = true;
+    setTimeout(() => {
+      spawnTile();
+      updateUI();
+      if (checkGameOver()) triggerGameOver();
+      isAnimating = false;
+    }, 120); // 애니메이션 딜레이
+  }
+}
+
+function triggerGameOver() {
+  if (gameOver) return;
+  gameOver = true;
+  if (score > bestScore) {
+    bestScore = score;
+    localStorage.setItem('arch_2048_best', bestScore);
+  }
+  document.getElementById('final-score').textContent = score.toLocaleString();
+  document.getElementById('go-overlay').classList.add('on');
+  notify('GRID_DEADLOCK_DETECTED');
+  addLog('!!! DEADLOCK TERMINATED');
+}
+
+function restartGame() {
+  document.getElementById('go-overlay').classList.remove('on');
+  gameOver = false;
+  initGrid();
+  notify('REINITIALIZING PROTOCOL...');
+  addLog('--- RESTART ---');
+}
+
+// ── RENDER ──
+function drawRoundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+}
+
+function draw() {
+  ctx.clearRect(0, 0, CW, CH);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CW, CH);
+
+  // Background Grid Cells
+  ctx.fillStyle = 'rgba(255,255,255,.05)';
+  ctx.strokeStyle = 'rgba(255,255,255,.1)';
+  ctx.lineWidth = 1;
+  for (let r=0; r<SIZE; r++) {
+    for (let c=0; c<SIZE; c++) {
+      let x = PAD + c*(CELL+GAP);
+      let y = PAD + r*(CELL+GAP);
+      drawRoundRect(x, y, CELL, CELL, 8);
+      ctx.fill(); ctx.stroke();
+    }
+  }
+
+  // Draw Animated Tiles
+  animTiles.forEach(t => {
+    // Linear Interpolation for movement
+    t.r += (t.targetR - t.r) * 0.4;
+    t.c += (t.targetC - t.c) * 0.4;
+    
+    // Scale animation (pop effect)
+    if (t.merged) { t.scale += (1 - t.scale) * 0.3; } 
+    else if (t.scale < 1) { t.scale += (1 - t.scale) * 0.4; }
+
+    let x = PAD + t.c*(CELL+GAP);
+    let y = PAD + t.r*(CELL+GAP);
+    let center = CELL/2;
+    
+    let drawX = x + center - (center * t.scale);
+    let drawY = y + center - (center * t.scale);
+    let drawSize = CELL * t.scale;
+    let rad = 8 * t.scale;
+
+    if (t.scale > 0.05) {
+      const img = imgs[t.id];
+      ctx.save();
+      drawRoundRect(drawX, drawY, drawSize, drawSize, rad);
+      ctx.clip();
+      
+      if (img && img.complete && img.naturalWidth > 0) {
+        ctx.drawImage(img, drawX, drawY, drawSize, drawSize);
+      } else {
+        // Fallback UI if image not found
+        ctx.fillStyle = '#111'; ctx.fill();
+        ctx.fillStyle = '#fff';
+        ctx.font = `900 ${drawSize * 0.3}px Orbitron, sans-serif`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(t.val, drawX + drawSize/2, drawY + drawSize/2);
+      }
+      ctx.restore();
+      
+      // Tile Border Overlay
+      ctx.save();
+      drawRoundRect(drawX, drawY, drawSize, drawSize, rad);
+      ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.5; ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.lineWidth = 4; ctx.stroke();
+      ctx.restore();
+    }
+  });
+}
+
+function loop() {
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ── UI UPDATE ──
+function updateUI() {
+  document.getElementById('score-disp').textContent = score.toLocaleString();
+  document.getElementById('best-disp').textContent  = bestScore.toLocaleString();
+  drawTargetPreview();
+  updateCharList();
+}
+
+function drawTargetPreview() {
+  const nc = document.getElementById('next-canvas');
+  const nx = nc.getContext('2d');
+  nx.clearRect(0,0,72,72);
+  nx.fillStyle = '#000'; nx.fillRect(0,0,72,72);
+  
+  // 타겟 타일 (2048) 프리뷰
+  const targetId = 11;
+  const img = imgs[targetId];
+  const tpad = 6;
+  const tsize = 60;
+  
+  nx.save();
+  nx.beginPath(); nx.roundRect(tpad, tpad, tsize, tsize, 4); nx.clip();
+  if (img && img.complete && img.naturalWidth > 0) {
+    nx.drawImage(img, tpad, tpad, tsize, tsize);
+  } else {
+    nx.fillStyle = '#111'; nx.fill(); nx.fillStyle = '#fff';
+    nx.font = `900 16px Orbitron, sans-serif`;
+    nx.textAlign = 'center'; nx.textBaseline = 'middle';
+    nx.fillText(UNITS[targetId-1].val, 36, 36);
+  }
+  nx.restore();
+  nx.strokeStyle = 'rgba(255,255,255,.3)'; nx.lineWidth = 1;
+  nx.beginPath(); nx.roundRect(tpad, tpad, tsize, tsize, 4); nx.stroke();
+}
+
+function updateCharList() {
+  const list = document.getElementById('char-list');
+  list.innerHTML = '';
+  UNITS.forEach(u => {
+    const isOn = unlocked.has(u.id);
+    const row = document.createElement('div');
+    row.className = `crow ${isOn?'on':''}`;
+    row.innerHTML = `<img class="cimg" src="${u.img}" onerror="this.style.opacity='.15'">
+      <div><div class="cname">${isOn ? u.name : '???'}</div>
+      <div class="cpts">${isOn ? u.val : '- - -'}</div></div>`;
+    list.appendChild(row);
+  });
+}
+
+let notifTimer;
+function notify(msg) {
+  const el = document.getElementById('notif');
+  el.textContent = `>> ${msg}`;
+  el.style.display = 'block'; el.style.animation = 'none'; void el.offsetWidth;
+  el.style.animation = 'notifIn .3s forwards';
+  clearTimeout(notifTimer);
+  notifTimer = setTimeout(() => { el.style.display='none'; }, 3200);
+}
+
+let logLines = [];
+function addLog(msg) {
+  logLines.push(msg);
+  if (logLines.length > 12) logLines.shift();
+  const el = document.getElementById('sys-log');
+  el.textContent = logLines.join('\n');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── INPUT (Keyboard & Touch) ──
+document.addEventListener('keydown', e => {
+  if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(e.key)) e.preventDefault();
+  if (e.key === 'ArrowUp') slide(0, -1);
+  if (e.key === 'ArrowDown') slide(0, 1);
+  if (e.key === 'ArrowLeft') slide(-1, 0);
+  if (e.key === 'ArrowRight') slide(1, 0);
+});
+
+let touchStartX = 0; let touchStartY = 0;
+canvas.addEventListener('touchstart', e => {
+  touchStartX = e.changedTouches[0].screenX;
+  touchStartY = e.changedTouches[0].screenY;
+}, { passive: true });
+
+canvas.addEventListener('touchend', e => {
+  let touchEndX = e.changedTouches[0].screenX;
+  let touchEndY = e.changedTouches[0].screenY;
+  handleSwipe(touchStartX, touchStartY, touchEndX, touchEndY);
+});
+
+function handleSwipe(startX, startY, endX, endY) {
+  const dx = endX - startX;
+  const dy = endY - startY;
+  if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return; // Too short
+  if (Math.abs(dx) > Math.abs(dy)) {
+    if (dx > 0) slide(1, 0); else slide(-1, 0);
+  } else {
+    if (dy > 0) slide(0, 1); else slide(0, -1);
+  }
+}
+
+// Cursor styling (Desktop)
+const cursorEl = document.getElementById('cursor');
+document.addEventListener('mousemove', e => {
+  cursorEl.style.left = e.clientX + 'px'; cursorEl.style.top  = e.clientY + 'px';
+});
+document.addEventListener('mousedown', () => cursorEl.classList.add('click'));
+document.addEventListener('mouseup',   () => cursorEl.classList.remove('click'));
+
+// ── CAPTURE & SHARE ──
+let capturedDataURL = null;
+async function captureScreen() {
+  const btn = document.getElementById('capture-btn');
+  btn.classList.add('capturing'); btn.innerHTML = '...';
+  const flash = document.getElementById('flash');
+  flash.classList.add('on'); setTimeout(() => flash.classList.remove('on'), 120);
+
+  try {
+    const gameCanvas = document.getElementById('gc');
+    const GW = gameCanvas.width, GH = gameCanvas.height, BANNER = 80, PAD = 24;
+    const out = document.createElement('canvas');
+    out.width = GW; out.height = GH + BANNER;
+    const oc = out.getContext('2d');
+
+    oc.drawImage(gameCanvas, 0, 0);
+
+    oc.fillStyle = 'rgba(0,0,0,0.75)'; oc.fillRect(0,0,GW,38);
+    oc.fillStyle = 'rgba(255,255,255,0.55)'; oc.font = '700 10px Orbitron, sans-serif'; oc.textAlign = 'left';
+    oc.fillText('「ARCH」 2048 PROTOCOL', PAD, 24);
+
+    const BY = GH;
+    oc.fillStyle = '#000'; oc.fillRect(0, BY, GW, BANNER);
+    oc.strokeStyle = 'rgba(255,255,255,0.4)'; oc.beginPath(); oc.moveTo(0,BY); oc.lineTo(GW,BY); oc.stroke();
+    oc.fillStyle = 'rgba(255,255,255,0.4)'; oc.font = '700 9px Orbitron, sans-serif';
+    oc.fillText('CURRENT_SCORE', PAD+12, BY+26);
+    oc.fillStyle = '#ffffff'; oc.font = '900 28px Orbitron, sans-serif';
+    oc.fillText(score.toLocaleString(), PAD+12, BY+58);
+    oc.fillStyle = 'rgba(255,255,255,0.35)'; oc.textAlign = 'right'; oc.fillText('BEST', GW-PAD, BY+26);
+    oc.fillStyle = 'rgba(255,255,255,0.7)'; oc.font = '700 16px Orbitron, sans-serif'; oc.fillText(bestScore.toLocaleString(), GW-PAD, BY+50);
+
+    capturedDataURL = out.toDataURL('image/png');
+    document.getElementById('share-preview').src = capturedDataURL;
+    document.getElementById('share-modal').classList.add('on');
+    document.getElementById('share-native-btn').style.display = navigator.share ? '' : 'none';
+    notify('SCORE_RECORD_CAPTURED');
+  } catch (e) {
+    notify('CAPTURE_FAILED: ' + e.message); console.error(e);
+  }
+  btn.classList.remove('capturing'); btn.innerHTML = '<span class="cam-icon">⊡</span> CAPTURE_SCORE';
+}
+
+function downloadCapture() {
+  if (!capturedDataURL) return;
+  const a = document.createElement('a');
+  a.href = capturedDataURL; a.download = `ARCH_2048_${score}_${Date.now()}.png`; a.click();
+  notify('IMAGE_SAVED'); closeShareModal();
+}
+
+async function shareCapture() {
+  if (!capturedDataURL || !navigator.share) return;
+  try {
+    const blob = await (await fetch(capturedDataURL)).blob();
+    const file = new File([blob], `ARCH_2048_${score}.png`, { type: 'image/png' });
+    await navigator.share({ title: '「ARCH」 2048 PROTOCOL', text: `SCORE: ${score.toLocaleString()}`, files: [file] });
+  } catch (e) {}
+  closeShareModal();
+}
+function closeShareModal() { document.getElementById('share-modal').classList.remove('on'); }
+document.getElementById('share-modal').addEventListener('click', function(e){ if(e.target===this) closeShareModal(); });
+
+setInterval(() => { document.getElementById('clock').textContent = new Date().toLocaleTimeString('en-GB'); }, 1000);
+
+// ── BOOT ──
+window.onload = async () => {
+  if (document.fonts && document.fonts.ready) await document.fonts.ready;
+  loadImages(() => {
+    initGrid();
+    addLog('SYSTEM_ONLINE');
+    notify('SYSTEM ONLINE');
+    requestAnimationFrame(loop);
+  });
+};
+</script>
+</body>
+</html>

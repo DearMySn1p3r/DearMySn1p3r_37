@@ -386,8 +386,6 @@
 //  「ARCH」 2048 PROTOCOL — GAME ENGINE
 // ═══════════════════════════════════════════
 
-// ── CONFIG ──
-// ✅ 스크린샷과 동일하게 확장자 수정 완료
 const UNITS = [
   { id:1,  img:'A1.jpg',  val:2,    pts:2,    name:'RUBY' },
   { id:2,  img:'A2.jpg',  val:4,    pts:4,    name:'SHARD' },
@@ -403,10 +401,10 @@ const UNITS = [
 ];
 
 const SIZE = 4;
-const CW = 380, CH = 380; 
+const BASE_W = 380, BASE_H = 380; 
 const PAD = 10;
 const GAP = 8;
-const CELL = (CW - PAD*2 - GAP*(SIZE-1)) / SIZE;
+const CELL = (BASE_W - PAD*2 - GAP*(SIZE-1)) / SIZE;
 
 // ── IMAGE LOADER ──
 const imgs = {};
@@ -430,10 +428,21 @@ let gameOver = false;
 let isAnimating = false;
 let unlocked = new Set([1]); 
 
-// ── CANVAS ──
+// ── CANVAS HDPI OPTIMIZATION ──
 const canvas = document.getElementById('gc');
-canvas.width = CW; canvas.height = CH;
 const ctx = canvas.getContext('2d');
+let dpr = window.devicePixelRatio || 1;
+
+function resizeCanvas() {
+  dpr = window.devicePixelRatio || 1;
+  canvas.width = BASE_W * dpr;
+  canvas.height = BASE_H * dpr;
+  ctx.scale(dpr, dpr);
+  
+  // 고화질 이미지 보정 옵션 적용
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+}
 
 // ── ENGINE LOGIC ──
 function initGrid() {
@@ -490,13 +499,13 @@ function spawnScorePop(r, c, text) {
   el.className = 'score-pop';
   el.textContent = text;
   const rect = canvas.getBoundingClientRect();
-  const scale = rect.width / canvas.width;
+  const cssScale = rect.width / BASE_W;
   
   const px = PAD + c*(CELL+GAP) + CELL/2;
   const py = PAD + r*(CELL+GAP) + CELL/2;
   
-  el.style.left = (rect.left + px * scale) + 'px';
-  el.style.top  = (rect.top + py * scale - 10) + 'px';
+  el.style.left = (rect.left + px * cssScale) + 'px';
+  el.style.top  = (rect.top + py * cssScale - 10) + 'px';
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 850);
 }
@@ -532,7 +541,6 @@ function slide(dirX, dirY) {
             newGrid[nextR][nextC] && newGrid[nextR][nextC].id === curr.id && 
             !mergedFlags[nextR][nextC] && curr.id < 11) {
           
-          let target = newGrid[nextR][nextC];
           let nextId = curr.id + 1;
           let nextVal = UNITS[nextId-1].val;
           let pts = UNITS[nextId-1].pts;
@@ -596,20 +604,55 @@ function restartGame() {
   addLog('--- RESTART ---');
 }
 
-// ── RENDER ──
-function drawRoundRect(x, y, w, h, r) {
-  ctx.beginPath();
-  ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y);
-  ctx.quadraticCurveTo(x + w, y, x + w, y + r); ctx.lineTo(x + w, y + h - r);
-  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); ctx.lineTo(x + r, y + h);
-  ctx.quadraticCurveTo(x, y + h, x, y + h - r); ctx.lineTo(x, y + r);
-  ctx.quadraticCurveTo(x, y, x + r, y); ctx.closePath();
+// ── RENDER ENGINE ──
+function drawRoundRect(targetCtx, x, y, w, h, r) {
+  targetCtx.beginPath();
+  targetCtx.moveTo(x + r, y); targetCtx.lineTo(x + w - r, y);
+  targetCtx.quadraticCurveTo(x + w, y, x + w, y + r); targetCtx.lineTo(x + w, y + h - r);
+  targetCtx.quadraticCurveTo(x + w, y + h, x + w - r, y + h); targetCtx.lineTo(x + r, y + h);
+  targetCtx.quadraticCurveTo(x, y + h, x, y + h - r); targetCtx.lineTo(x, y + r);
+  targetCtx.quadraticCurveTo(x, y, x + r, y); targetCtx.closePath();
+}
+
+// 공용 타일 그리기 함수 (메인 루프 및 고해상도 캡처화면 공유)
+function drawSingleTile(targetCtx, t, x, y, size, rad) {
+  const img = imgs[t.id];
+  targetCtx.save();
+  drawRoundRect(targetCtx, x, y, size, size, rad);
+  targetCtx.clip();
+  
+  if (img && img.complete && img.naturalWidth > 0) {
+    targetCtx.drawImage(img, x, y, size, size);
+  } else {
+    targetCtx.fillStyle = '#111'; targetCtx.fill();
+    targetCtx.fillStyle = '#fff';
+    targetCtx.font = `900 ${size * 0.22}px Orbitron, sans-serif`;
+    targetCtx.textAlign = 'center'; targetCtx.textBaseline = 'middle';
+    targetCtx.fillText(UNITS[t.id-1].name, x + size/2, y + size/2);
+  }
+  
+  // ✅ [요청 반영] 이미지 위에 은은하게 비치는 2048 숫자 오버레이
+  targetCtx.fillStyle = 'rgba(255, 255, 255, 0.16)';
+  targetCtx.font = `900 ${size * 0.32}px Orbitron, sans-serif`;
+  targetCtx.textAlign = 'center';
+  targetCtx.textBaseline = 'middle';
+  targetCtx.shadowColor = 'rgba(0, 0, 0, 0.7)';
+  targetCtx.shadowBlur = 6;
+  targetCtx.fillText(UNITS[t.id-1].val, x + size/2, y + size/2);
+  targetCtx.restore();
+  
+  targetCtx.save();
+  drawRoundRect(targetCtx, x, y, size, size, rad);
+  targetCtx.strokeStyle = 'rgba(255,255,255,.4)'; targetCtx.lineWidth = 1.5; targetCtx.stroke();
+  targetCtx.strokeStyle = 'rgba(255,255,255,.1)'; targetCtx.lineWidth = 4; targetCtx.stroke();
+  targetCtx.restore();
 }
 
 function draw() {
-  ctx.clearRect(0, 0, CW, CH);
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CW, CH);
+  ctx.clearRect(0, 0, BASE_W, BASE_H);
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, BASE_W, BASE_H);
 
+  // 셀 배경 격자선
   ctx.fillStyle = 'rgba(255,255,255,.05)';
   ctx.strokeStyle = 'rgba(255,255,255,.1)';
   ctx.lineWidth = 1;
@@ -617,11 +660,12 @@ function draw() {
     for (let c=0; c<SIZE; c++) {
       let x = PAD + c*(CELL+GAP);
       let y = PAD + r*(CELL+GAP);
-      drawRoundRect(x, y, CELL, CELL, 8);
+      drawRoundRect(ctx, x, y, CELL, CELL, 8);
       ctx.fill(); ctx.stroke();
     }
   }
 
+  // 무빙/스케일 애니메이션 타일 렌더링
   animTiles.forEach(t => {
     t.r += (t.targetR - t.r) * 0.4;
     t.c += (t.targetC - t.c) * 0.4;
@@ -639,27 +683,7 @@ function draw() {
     let rad = 8 * t.scale;
 
     if (t.scale > 0.05) {
-      const img = imgs[t.id];
-      ctx.save();
-      drawRoundRect(drawX, drawY, drawSize, drawSize, rad);
-      ctx.clip();
-      
-      if (img && img.complete && img.naturalWidth > 0) {
-        ctx.drawImage(img, drawX, drawY, drawSize, drawSize);
-      } else {
-        ctx.fillStyle = '#111'; ctx.fill();
-        ctx.fillStyle = '#fff';
-        ctx.font = `900 ${drawSize * 0.22}px Orbitron, sans-serif`;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(UNITS[t.id-1].name, drawX + drawSize/2, drawY + drawSize/2);
-      }
-      ctx.restore();
-      
-      ctx.save();
-      drawRoundRect(drawX, drawY, drawSize, drawSize, rad);
-      ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.5; ctx.stroke();
-      ctx.strokeStyle = 'rgba(255,255,255,.1)'; ctx.lineWidth = 4; ctx.stroke();
-      ctx.restore();
+      drawSingleTile(ctx, t, drawX, drawY, drawSize, rad);
     }
   });
 }
@@ -748,7 +772,7 @@ document.addEventListener('mousemove', e => {
 document.addEventListener('mousedown', () => cursorEl.classList.add('click'));
 document.addEventListener('mouseup',   () => cursorEl.classList.remove('click'));
 
-// ── CAPTURE & SHARE ──
+// ── ✅ [요청 반영] 정밀화 및 레이아웃을 전면 수정한 고화질 캡처 기능 ──
 let capturedDataURL = null;
 async function captureScreen() {
   const btn = document.getElementById('capture-btn');
@@ -757,27 +781,70 @@ async function captureScreen() {
   flash.classList.add('on'); setTimeout(() => flash.classList.remove('on'), 120);
 
   try {
-    const gameCanvas = document.getElementById('gc');
-    const GW = gameCanvas.width, GH = gameCanvas.height, BANNER = 80, PAD = 24;
+    syncAnimTiles(); // 캡처 전 애니메이션 축 위치 동기화 보정
+
+    const BANNER_H = 90; 
     const out = document.createElement('canvas');
-    out.width = GW; out.height = GH + BANNER;
+    
+    // 캡처본 역시 기기의 고해상도 비율을 동등하게 연산하여 선명도 유지
+    const capDpr = window.devicePixelRatio || 1;
+    out.width = BASE_W * capDpr;
+    out.height = (BASE_H + BANNER_H) * capDpr;
+    
     const oc = out.getContext('2d');
+    oc.scale(capDpr, capDpr);
+    oc.imageSmoothingEnabled = true;
+    oc.imageSmoothingQuality = 'high';
 
-    oc.drawImage(gameCanvas, 0, 0);
+    // 1. 게임 내부 화면 렌더링을 복제
+    oc.fillStyle = '#000'; oc.fillRect(0, 0, BASE_W, BASE_H);
+    oc.fillStyle = 'rgba(255,255,255,.05)';
+    oc.strokeStyle = 'rgba(255,255,255,.1)';
+    oc.lineWidth = 1;
+    for (let r=0; r<SIZE; r++) {
+      for (let c=0; c<SIZE; c++) {
+        drawRoundRect(oc, PAD + c*(CELL+GAP), PAD + r*(CELL+GAP), CELL, CELL, 8);
+        oc.fill(); oc.stroke();
+      }
+    }
+    
+    // 격자 위에 현재 배치된 실시간 타일 스냅샷 드로잉
+    for (let r=0; r<SIZE; r++) {
+      for (let c=0; c<SIZE; c++) {
+        if (grid[r][c]) {
+          let x = PAD + c*(CELL+GAP);
+          let y = PAD + r*(CELL+GAP);
+          drawSingleTile(oc, { id: grid[r][c].id }, x, y, CELL, 8);
+        }
+      }
+    }
 
-    oc.fillStyle = 'rgba(0,0,0,0.75)'; oc.fillRect(0,0,GW,38);
-    oc.fillStyle = 'rgba(255,255,255,0.55)'; oc.font = '700 10px Orbitron, sans-serif'; oc.textAlign = 'left';
-    oc.fillText('「ARCH」 2048 PROTOCOL', PAD, 24);
+    // 상단 반투명 탑 브릿지 오버레이 배치
+    oc.fillStyle = 'rgba(0,0,0,0.75)'; oc.fillRect(0, 0, BASE_W, 40);
+    oc.fillStyle = '#ffffff'; oc.font = '700 11px Orbitron, sans-serif'; oc.textAlign = 'left'; oc.textBaseline = 'middle';
+    oc.fillText('「ARCH」 2048 PROTOCOL', 18, 20);
 
-    const BY = GH;
-    oc.fillStyle = '#000'; oc.fillRect(0, BY, GW, BANNER);
-    oc.strokeStyle = 'rgba(255,255,255,0.4)'; oc.beginPath(); oc.moveTo(0,BY); oc.lineTo(GW,BY); oc.stroke();
+    // 2. 하단 스코어 보드 배너 설계 (수학적 절대 좌표 배치를 통한 글자 깨짐 방지)
+    const BY = BASE_H;
+    oc.fillStyle = '#000000'; oc.fillRect(0, BY, BASE_W, BANNER_H);
+    
+    // 구분선
+    oc.strokeStyle = 'rgba(255,255,255,0.25)'; oc.lineWidth = 1;
+    oc.beginPath(); oc.moveTo(0, BY); oc.lineTo(BASE_W, BY); oc.stroke();
+
+    // SCORE 라벨 및 텍스트 데이터 정밀 배치
+    oc.textAlign = 'left';
     oc.fillStyle = 'rgba(255,255,255,0.4)'; oc.font = '700 9px Orbitron, sans-serif';
-    oc.fillText('CURRENT_SCORE', PAD+12, BY+26);
-    oc.fillStyle = '#ffffff'; oc.font = '900 28px Orbitron, sans-serif';
-    oc.fillText(score.toLocaleString(), PAD+12, BY+58);
-    oc.fillStyle = 'rgba(255,255,255,0.35)'; oc.textAlign = 'right'; oc.fillText('BEST', GW-PAD, BY+26);
-    oc.fillStyle = 'rgba(255,255,255,0.7)'; oc.font = '700 16px Orbitron, sans-serif'; oc.fillText(bestScore.toLocaleString(), GW-PAD, BY+50);
+    oc.fillText('CURRENT_SCORE', 20, BY + 28);
+    oc.fillStyle = '#ffffff'; oc.font = '900 26px Orbitron, sans-serif';
+    oc.fillText(score.toLocaleString(), 20, BY + 58);
+
+    // BEST 라벨 및 텍스트 데이터 정밀 우측 정렬 배치
+    oc.textAlign = 'right';
+    oc.fillStyle = 'rgba(255,255,255,0.4)'; oc.font = '700 9px Orbitron, sans-serif';
+    oc.fillText('BEST_RECORD', BASE_W - 20, BY + 28);
+    oc.fillStyle = 'rgba(255,255,255,0.85)'; oc.font = '900 20px Orbitron, sans-serif';
+    oc.fillText(bestScore.toLocaleString(), BASE_W - 20, BY + 58);
 
     capturedDataURL = out.toDataURL('image/png');
     document.getElementById('share-preview').src = capturedDataURL;
@@ -813,6 +880,9 @@ setInterval(() => { document.getElementById('clock').textContent = new Date().to
 
 // ── BOOT ──
 window.onload = async () => {
+  resizeCanvas();
+  window.addEventListener('resize', () => { resizeCanvas(); draw(); }); // 해상도 기기 변경 및 회전 대응
+  
   if (document.fonts && document.fonts.ready) await document.fonts.ready;
   loadImages(() => {
     initGrid();

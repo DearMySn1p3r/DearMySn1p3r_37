@@ -386,7 +386,6 @@
 //  「ARCH」 2048 PROTOCOL — GAME ENGINE
 // ═══════════════════════════════════════════
 
-// ── CONFIG (모든 확장자 png 지정 완료) ──
 const UNITS = [
   { id:1,  img:'A1.png',  val:2,    pts:2,    name:'RUBY' },
   { id:2,  img:'A2.png',  val:4,    pts:4,    name:'SHARD' },
@@ -407,7 +406,6 @@ const PAD = 10;
 const GAP = 8;
 const CELL = (BASE_W - PAD*2 - GAP*(SIZE-1)) / SIZE;
 
-// ── IMAGE LOADER ──
 const imgs = {};
 let loadedCount = 0;
 
@@ -439,7 +437,6 @@ function resizeCanvas() {
   canvas.width = BASE_W * dpr;
   canvas.height = BASE_H * dpr;
   ctx.scale(dpr, dpr);
-  
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = 'high';
 }
@@ -474,7 +471,6 @@ function spawnTile() {
   const val = UNITS[id-1].val;
   grid[r][c] = { id, val };
   unlocked.add(id);
-  
   animTiles.push({ r, c, id, val, targetR: r, targetC: c, scale: 0, merged: false });
 }
 
@@ -510,6 +506,7 @@ function spawnScorePop(r, c, text) {
   setTimeout(() => el.remove(), 850);
 }
 
+// 💥 핵심 수정: 물리엔진 누수 버그 완벽 패치 완료
 function slide(dirX, dirY) {
   if (gameOver || isAnimating) return;
   syncAnimTiles();
@@ -525,17 +522,15 @@ function slide(dirX, dirY) {
     traverseC.forEach(c => {
       if (grid[r][c]) {
         let curr = grid[r][c];
-        let currR = r;
-        let currC = c;
-        let nextR = currR + dirY;
-        let nextC = currC + dirX;
+        let currR = r; let currC = c;
+        let nextR = currR + dirY; let nextC = currC + dirX;
 
         while (nextR >= 0 && nextR < SIZE && nextC >= 0 && nextC < SIZE && !newGrid[nextR][nextC]) {
-          currR = nextR;
-          currC = nextC;
-          nextR += dirY;
-          nextC += dirX;
+          currR = nextR; currC = nextC;
+          nextR += dirY; nextC += dirX;
         }
+
+        let animT = animTiles.find(t => t.targetR === r && t.targetC === c);
 
         if (nextR >= 0 && nextR < SIZE && nextC >= 0 && nextC < SIZE && 
             newGrid[nextR][nextC] && newGrid[nextR][nextC].id === curr.id && 
@@ -552,9 +547,7 @@ function slide(dirX, dirY) {
           unlocked.add(nextId);
           moved = true;
 
-          let animT = animTiles.find(t => t.targetR === r && t.targetC === c);
           if (animT) { animT.targetR = nextR; animT.targetC = nextC; }
-          
           animTiles.push({ r: nextR, c: nextC, id: nextId, val: nextVal, targetR: nextR, targetC: nextC, scale: 0.5, merged: true });
           
           spawnScorePop(nextR, nextC, `+${pts}`);
@@ -563,8 +556,6 @@ function slide(dirX, dirY) {
         } else {
           newGrid[currR][currC] = curr;
           if (currR !== r || currC !== c) moved = true;
-          
-          let animT = animTiles.find(t => t.targetR === r && t.targetC === c);
           if (animT) { animT.targetR = currR; animT.targetC = currC; }
         }
       }
@@ -575,6 +566,15 @@ function slide(dirX, dirY) {
     grid = newGrid;
     isAnimating = true;
     setTimeout(() => {
+      // 💥 렌더링 누수 버그 픽스: 죽은 타일이 메모리에 쌓이지 않도록 실제 게임판 기준으로 화면 클린 동기화
+      animTiles = [];
+      for(let r=0; r<SIZE; r++) {
+        for(let c=0; c<SIZE; c++) {
+          if(grid[r][c]) {
+            animTiles.push({ r, c, targetR: r, targetC: c, id: grid[r][c].id, val: grid[r][c].val, scale: 1, merged: false });
+          }
+        }
+      }
       spawnTile();
       updateUI();
       if (checkGameOver()) triggerGameOver();
@@ -614,7 +614,6 @@ function drawRoundRect(targetCtx, x, y, w, h, r) {
   targetCtx.quadraticCurveTo(x, y, x + r, y); targetCtx.closePath();
 }
 
-// 공용 타일 드로잉 함수 (메인 뷰포트 & 캡처 컨텍스트 공동 사용)
 function drawSingleTile(targetCtx, t, x, y, size, rad) {
   const img = imgs[t.id];
   targetCtx.save();
@@ -631,24 +630,28 @@ function drawSingleTile(targetCtx, t, x, y, size, rad) {
     targetCtx.fillText(UNITS[t.id-1].name, x + size/2, y + size/2);
   }
   
-  // ✅ [요청 반영] 투명도 제거 후 외곽 테두리를 추가한 초고시인성 텍스트 마킹 시스템
+  // 💥 핵심 디자인 수정: 이미지를 전혀 가리지 않도록 텍스트를 작게 줄이고 좌측 상단 구석에 깔끔하게 박아둠
   const valText = UNITS[t.id-1].val.toString();
-  targetCtx.font = `900 ${size * 0.32}px Orbitron, sans-serif`;
-  targetCtx.textAlign = 'center';
-  targetCtx.textBaseline = 'middle';
+  const fontSize = size * 0.18; // 훨씬 작게 조정
+  targetCtx.font = `900 ${fontSize}px Orbitron, sans-serif`;
+  targetCtx.textAlign = 'left';
+  targetCtx.textBaseline = 'top';
   
-  // 블랙 테두리 배경선 처리 (가독성 확보용)
+  const pad = size * 0.08;
+  const textX = x + pad;
+  const textY = y + pad;
+
+  // 또렷한 가독성을 위한 블랙 외곽선(Stroke)
   targetCtx.strokeStyle = '#000000';
-  targetCtx.lineWidth = Math.max(2, size * 0.06);
+  targetCtx.lineWidth = Math.max(2, size * 0.05);
   targetCtx.lineJoin = 'round';
-  targetCtx.strokeText(valText, x + size/2, y + size/2);
+  targetCtx.strokeText(valText, textX, textY);
   
-  // 화이트 솔리드 글자 채우기 (투명도 없음)
+  // 화이트 텍스트 채우기
   targetCtx.fillStyle = '#ffffff';
-  targetCtx.fillText(valText, x + size/2, y + size/2);
+  targetCtx.fillText(valText, textX, textY);
   targetCtx.restore();
   
-  // 타일 외부 글래스 프레임워크 링 배치
   targetCtx.save();
   drawRoundRect(targetCtx, x, y, size, size, rad);
   targetCtx.strokeStyle = 'rgba(255,255,255,.4)'; targetCtx.lineWidth = 1.5; targetCtx.stroke();
@@ -660,7 +663,6 @@ function draw() {
   ctx.clearRect(0, 0, BASE_W, BASE_H);
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, BASE_W, BASE_H);
 
-  // 셀 배경 격자 백그라운드
   ctx.fillStyle = 'rgba(255,255,255,.05)';
   ctx.strokeStyle = 'rgba(255,255,255,.1)';
   ctx.lineWidth = 1;
@@ -673,7 +675,6 @@ function draw() {
     }
   }
 
-  // 실시간 무빙 및 합성 애니메이션 타일 처리
   animTiles.forEach(t => {
     t.r += (t.targetR - t.r) * 0.4;
     t.c += (t.targetC - t.c) * 0.4;
@@ -780,7 +781,7 @@ document.addEventListener('mousemove', e => {
 document.addEventListener('mousedown', () => cursorEl.classList.add('click'));
 document.addEventListener('mouseup',   () => cursorEl.classList.remove('click'));
 
-// ── ✅ [요청 반영] 글자 깨짐 및 이탈 현상을 전면 보정하여 수식 정렬한 고화질 캡처 본문 ──
+// ── CAPTURE ──
 let capturedDataURL = null;
 async function captureScreen() {
   const btn = document.getElementById('capture-btn');
@@ -789,12 +790,11 @@ async function captureScreen() {
   flash.classList.add('on'); setTimeout(() => flash.classList.remove('on'), 120);
 
   try {
-    syncAnimTiles(); // 캡처 전 모션 보간 위치 정렬 동기화
+    syncAnimTiles();
 
     const BANNER_H = 90; 
     const out = document.createElement('canvas');
     
-    // 모바일 및 고해상도 환경의 해상도 왜곡을 방지하기 위해 캡처 캔버스도 동일 dpr 스케일링 지정
     const capDpr = window.devicePixelRatio || 1;
     out.width = BASE_W * capDpr;
     out.height = (BASE_H + BANNER_H) * capDpr;
@@ -804,7 +804,6 @@ async function captureScreen() {
     oc.imageSmoothingEnabled = true;
     oc.imageSmoothingQuality = 'high';
 
-    // 1. 인게임 화면 리빌드 렌더링 시작 (왜곡 없는 고품질 복제 방식)
     oc.fillStyle = '#000'; oc.fillRect(0, 0, BASE_W, BASE_H);
     oc.fillStyle = 'rgba(255,255,255,.05)';
     oc.strokeStyle = 'rgba(255,255,255,.1)';
@@ -816,7 +815,6 @@ async function captureScreen() {
       }
     }
     
-    // 실시간 배치 그리드 스냅샷 마킹
     for (let r=0; r<SIZE; r++) {
       for (let c=0; c<SIZE; c++) {
         if (grid[r][c]) {
@@ -827,27 +825,22 @@ async function captureScreen() {
       }
     }
 
-    // 최상단 오버레이 브릿지 탑재
     oc.fillStyle = 'rgba(0,0,0,0.75)'; oc.fillRect(0, 0, BASE_W, 40);
     oc.fillStyle = '#ffffff'; oc.font = '700 11px Orbitron, sans-serif'; oc.textAlign = 'left'; oc.textBaseline = 'middle';
     oc.fillText('「ARCH」 2048 PROTOCOL', 18, 20);
 
-    // 2. 하단 스코어 보드 배너 데이터 설계 (수학적 좌표 연산 배치로 글자 깨짐 완전 해결)
     const BY = BASE_H;
     oc.fillStyle = '#000000'; oc.fillRect(0, BY, BASE_W, BANNER_H);
     
-    // 분리 경계선
     oc.strokeStyle = 'rgba(255,255,255,0.25)'; oc.lineWidth = 1;
     oc.beginPath(); oc.moveTo(0, BY); oc.lineTo(BASE_W, BY); oc.stroke();
 
-    // SCORE 헤더 및 데이터 세로라인 정밀 가이드 정렬
     oc.textAlign = 'left';
     oc.fillStyle = 'rgba(255,255,255,0.4)'; oc.font = '700 9px Orbitron, sans-serif';
     oc.fillText('CURRENT_SCORE', 20, BY + 28);
     oc.fillStyle = '#ffffff'; oc.font = '900 26px Orbitron, sans-serif';
     oc.fillText(score.toLocaleString(), 20, BY + 58);
 
-    // BEST 헤더 및 데이터 우측 대칭 마진 라운딩 배치
     oc.textAlign = 'right';
     oc.fillStyle = 'rgba(255,255,255,0.4)'; oc.font = '700 9px Orbitron, sans-serif';
     oc.fillText('BEST_RECORD', BASE_W - 20, BY + 28);
@@ -889,7 +882,7 @@ setInterval(() => { document.getElementById('clock').textContent = new Date().to
 // ── BOOT ──
 window.onload = async () => {
   resizeCanvas();
-  window.addEventListener('resize', () => { resizeCanvas(); draw(); }); // 브라우저 크기 변경 및 모바일 회전 대응 방어선 구축
+  window.addEventListener('resize', () => { resizeCanvas(); draw(); });
   
   if (document.fonts && document.fonts.ready) await document.fonts.ready;
   loadImages(() => {

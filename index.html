@@ -13,7 +13,7 @@
       --accent: #ffffff;
       --dim: rgba(255,255,255,0.4);
       --dimmer: rgba(255,255,255,0.1);
-      var(--font): 'Orbitron', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font: 'Orbitron', 'Noto Sans KR', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; cursor: none !important; }
     ::-webkit-scrollbar { width: 2px; height: 2px; }
@@ -101,10 +101,6 @@
     .box-val { font-size: 30px; font-weight: 900; text-shadow: 0 0 18px rgba(255,255,255,.6); }
     .box-val.sm { font-size: 20px; }
 
-    /* Target preview */
-    #next-wrap { display: flex; align-items: center; justify-content: center; padding: 6px 0 2px; }
-    #next-canvas { border-radius: 8px; border: 1px solid rgba(255,255,255,.3); box-shadow: 0 0 14px rgba(255,255,255,.12); }
-
     /* How to play */
     .howto { font-size: 10px; line-height: 2; color: rgba(255,255,255,.55); }
     .howto b { color: #fff; font-family: var(--font); font-size: 9px; }
@@ -142,7 +138,7 @@
       width: 100%;
       max-width: 380px;
       height: auto;
-      aspect-ratio: 1 / 1; /* 2048은 정사각형 비율 */
+      aspect-ratio: 1 / 1;
       object-fit: contain;
       touch-action: none; 
       border: 1px solid rgba(255,255,255,.45);
@@ -287,15 +283,12 @@
 
       .side { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; overflow-y: visible; }
       
-      #side-left { order: 1; grid-template-columns: 1fr 1fr 1fr; }
+      #side-left { order: 1; grid-template-columns: 1fr 1fr; }
       #game-wrap { order: 2; width: 100%; margin: 0 auto; }
       #side-right { order: 3; display: flex; flex-direction: column; }
 
       .box-score { grid-column: 1; }
       .box-best { grid-column: 2; }
-      .box-next { grid-column: 3; display: flex; flex-direction: column; align-items: center; padding: 8px; }
-      #next-wrap { padding: 2px 0; }
-      #next-canvas { width: 44px; height: 44px; }
 
       .box-capture { grid-column: 1 / -1; }
       .box-howto { grid-column: 1 / -1; }
@@ -352,12 +345,6 @@
       <div class="box-label">BEST</div>
       <div class="box-val sm" id="best-disp">0</div>
     </div>
-    <div class="box box-next">
-      <div class="box-label">TARGET</div>
-      <div id="next-wrap">
-        <canvas id="next-canvas" width="72" height="72"></canvas>
-      </div>
-    </div>
     <button id="capture-btn" class="box-capture" onclick="captureScreen()">
       <span class="cam-icon">⊡</span> CAPTURE_SCORE
     </button>
@@ -400,23 +387,23 @@
 // ═══════════════════════════════════════════
 
 // ── CONFIG ──
-// 2048 타일 설정 (id: 1~11 이 2~2048 에 대응)
+// ✅ 스크린샷과 동일하게 확장자 수정 완료
 const UNITS = [
-  { id:1,  img:'A1.png',  val:2,    pts:2,    name:'LEVEL_01' },
-  { id:2,  img:'A2.png',  val:4,    pts:4,    name:'LEVEL_02' },
-  { id:3,  img:'A3.png',  val:8,    pts:8,    name:'LEVEL_03' },
-  { id:4,  img:'A4.png',  val:16,   pts:16,   name:'LEVEL_04' },
-  { id:5,  img:'A5.png',  val:32,   pts:32,   name:'LEVEL_05' },
-  { id:6,  img:'A6.png',  val:64,   pts:64,   name:'LEVEL_06' },
-  { id:7,  img:'A7.png',  val:128,  pts:128,  name:'LEVEL_07' },
-  { id:8,  img:'A8.png',  val:256,  pts:256,  name:'LEVEL_08' },
-  { id:9,  img:'A9.png',  val:512,  pts:512,  name:'LEVEL_09' },
-  { id:10, img:'A10.png', val:1024, pts:1024, name:'LEVEL_10' },
-  { id:11, img:'A11.png', val:2048, pts:2048, name:'PROTOCOL_ARCH' },
+  { id:1,  img:'A1.jpg',  val:2,    pts:2,    name:'RUBY' },
+  { id:2,  img:'A2.jpg',  val:4,    pts:4,    name:'SHARD' },
+  { id:3,  img:'A3.png',  val:8,    pts:8,    name:'OASIS' },
+  { id:4,  img:'A4.jpg',  val:16,   pts:16,   name:'DR. VANCE' },
+  { id:5,  img:'A5.jpg',  val:32,   pts:32,   name:'LIAM' },
+  { id:6,  img:'A6.jpg',  val:64,   pts:64,   name:'ICARUS' },
+  { id:7,  img:'A7.png',  val:128,  pts:128,  name:'NOAH' },
+  { id:8,  img:'A8.png',  val:256,  pts:256,  name:'VIBE' },
+  { id:9,  img:'A9.jpg',  val:512,  pts:512,  name:'JUSTICE' },
+  { id:10, img:'A10.jpg', val:1024, pts:1024, name:'KARMA' },
+  { id:11, img:'A11.png', val:2048, pts:2048, name:'SYNDROME' },
 ];
 
 const SIZE = 4;
-const CW = 380, CH = 380; // 1:1 비율 정사각형
+const CW = 380, CH = 380; 
 const PAD = 10;
 const GAP = 8;
 const CELL = (CW - PAD*2 - GAP*(SIZE-1)) / SIZE;
@@ -435,13 +422,13 @@ function loadImages(cb) {
 }
 
 // ── STATE ──
-let grid = [];      // 4x4 배열, 각 셀은 객체 { id, val } 또는 null
-let animTiles = []; // 애니메이션 렌더링용 배열
+let grid = [];      
+let animTiles = []; 
 let score = 0;
 let bestScore = +(localStorage.getItem('arch_2048_best') || 0);
 let gameOver = false;
 let isAnimating = false;
-let unlocked = new Set([1]); // 최초엔 레벨1(숫자2)만 오픈됨
+let unlocked = new Set([1]); 
 
 // ── CANVAS ──
 const canvas = document.getElementById('gc');
@@ -460,7 +447,6 @@ function initGrid() {
   syncAnimTiles();
 }
 
-// 랜덤 빈 칸 가져오기
 function getEmptyCells() {
   let cells = [];
   for(let r=0; r<SIZE; r++) {
@@ -471,7 +457,6 @@ function getEmptyCells() {
   return cells;
 }
 
-// 새 타일 생성 (90% 확률로 2, 10% 확률로 4)
 function spawnTile() {
   const cells = getEmptyCells();
   if(cells.length === 0) return;
@@ -481,11 +466,9 @@ function spawnTile() {
   grid[r][c] = { id, val };
   unlocked.add(id);
   
-  // 애니메이션 객체 추가 (스케일 업 효과용)
   animTiles.push({ r, c, id, val, targetR: r, targetC: c, scale: 0, merged: false });
 }
 
-// 이동 가능 여부 체크
 function checkGameOver() {
   if (getEmptyCells().length > 0) return false;
   for (let r=0; r<SIZE; r++) {
@@ -498,7 +481,6 @@ function checkGameOver() {
   return true;
 }
 
-// 그리드 상태를 렌더 배열에 동기화
 function syncAnimTiles() {
   animTiles.forEach(t => { t.r = t.targetR; t.c = t.targetC; t.scale = 1; t.merged = false; });
 }
@@ -519,7 +501,6 @@ function spawnScorePop(r, c, text) {
   setTimeout(() => el.remove(), 850);
 }
 
-// 이동 로직
 function slide(dirX, dirY) {
   if (gameOver || isAnimating) return;
   syncAnimTiles();
@@ -540,7 +521,6 @@ function slide(dirX, dirY) {
         let nextR = currR + dirY;
         let nextC = currC + dirX;
 
-        // 끝까지 밀기
         while (nextR >= 0 && nextR < SIZE && nextC >= 0 && nextC < SIZE && !newGrid[nextR][nextC]) {
           currR = nextR;
           currC = nextC;
@@ -548,7 +528,6 @@ function slide(dirX, dirY) {
           nextC += dirX;
         }
 
-        // 합치기 조건 확인
         if (nextR >= 0 && nextR < SIZE && nextC >= 0 && nextC < SIZE && 
             newGrid[nextR][nextC] && newGrid[nextR][nextC].id === curr.id && 
             !mergedFlags[nextR][nextC] && curr.id < 11) {
@@ -565,16 +544,14 @@ function slide(dirX, dirY) {
           unlocked.add(nextId);
           moved = true;
 
-          // 기존 타일들이 이동하는 애니메이션
           let animT = animTiles.find(t => t.targetR === r && t.targetC === c);
           if (animT) { animT.targetR = nextR; animT.targetC = nextC; }
           
-          // 머지 이펙트를 위한 새 객체
           animTiles.push({ r: nextR, c: nextC, id: nextId, val: nextVal, targetR: nextR, targetC: nextC, scale: 0.5, merged: true });
           
           spawnScorePop(nextR, nextC, `+${pts}`);
-          addLog(`MERGE: ${UNITS[curr.id-1].val} + ${UNITS[curr.id-1].val} → ${nextVal}`);
-          notify(`FUSION: LV${curr.id} → LV${nextId}`);
+          addLog(`MERGE: ${UNITS[curr.id-1].name} → ${UNITS[nextId-1].name}`);
+          notify(`FUSION: ${UNITS[nextId-1].name}`);
         } else {
           newGrid[currR][currC] = curr;
           if (currR !== r || currC !== c) moved = true;
@@ -594,7 +571,7 @@ function slide(dirX, dirY) {
       updateUI();
       if (checkGameOver()) triggerGameOver();
       isAnimating = false;
-    }, 120); // 애니메이션 딜레이
+    }, 120); 
   }
 }
 
@@ -633,7 +610,6 @@ function draw() {
   ctx.clearRect(0, 0, CW, CH);
   ctx.fillStyle = '#000'; ctx.fillRect(0, 0, CW, CH);
 
-  // Background Grid Cells
   ctx.fillStyle = 'rgba(255,255,255,.05)';
   ctx.strokeStyle = 'rgba(255,255,255,.1)';
   ctx.lineWidth = 1;
@@ -646,13 +622,10 @@ function draw() {
     }
   }
 
-  // Draw Animated Tiles
   animTiles.forEach(t => {
-    // Linear Interpolation for movement
     t.r += (t.targetR - t.r) * 0.4;
     t.c += (t.targetC - t.c) * 0.4;
     
-    // Scale animation (pop effect)
     if (t.merged) { t.scale += (1 - t.scale) * 0.3; } 
     else if (t.scale < 1) { t.scale += (1 - t.scale) * 0.4; }
 
@@ -674,16 +647,14 @@ function draw() {
       if (img && img.complete && img.naturalWidth > 0) {
         ctx.drawImage(img, drawX, drawY, drawSize, drawSize);
       } else {
-        // Fallback UI if image not found
         ctx.fillStyle = '#111'; ctx.fill();
         ctx.fillStyle = '#fff';
-        ctx.font = `900 ${drawSize * 0.3}px Orbitron, sans-serif`;
+        ctx.font = `900 ${drawSize * 0.22}px Orbitron, sans-serif`;
         ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(t.val, drawX + drawSize/2, drawY + drawSize/2);
+        ctx.fillText(UNITS[t.id-1].name, drawX + drawSize/2, drawY + drawSize/2);
       }
       ctx.restore();
       
-      // Tile Border Overlay
       ctx.save();
       drawRoundRect(drawX, drawY, drawSize, drawSize, rad);
       ctx.strokeStyle = 'rgba(255,255,255,.4)'; ctx.lineWidth = 1.5; ctx.stroke();
@@ -702,35 +673,7 @@ function loop() {
 function updateUI() {
   document.getElementById('score-disp').textContent = score.toLocaleString();
   document.getElementById('best-disp').textContent  = bestScore.toLocaleString();
-  drawTargetPreview();
   updateCharList();
-}
-
-function drawTargetPreview() {
-  const nc = document.getElementById('next-canvas');
-  const nx = nc.getContext('2d');
-  nx.clearRect(0,0,72,72);
-  nx.fillStyle = '#000'; nx.fillRect(0,0,72,72);
-  
-  // 타겟 타일 (2048) 프리뷰
-  const targetId = 11;
-  const img = imgs[targetId];
-  const tpad = 6;
-  const tsize = 60;
-  
-  nx.save();
-  nx.beginPath(); nx.roundRect(tpad, tpad, tsize, tsize, 4); nx.clip();
-  if (img && img.complete && img.naturalWidth > 0) {
-    nx.drawImage(img, tpad, tpad, tsize, tsize);
-  } else {
-    nx.fillStyle = '#111'; nx.fill(); nx.fillStyle = '#fff';
-    nx.font = `900 16px Orbitron, sans-serif`;
-    nx.textAlign = 'center'; nx.textBaseline = 'middle';
-    nx.fillText(UNITS[targetId-1].val, 36, 36);
-  }
-  nx.restore();
-  nx.strokeStyle = 'rgba(255,255,255,.3)'; nx.lineWidth = 1;
-  nx.beginPath(); nx.roundRect(tpad, tpad, tsize, tsize, 4); nx.stroke();
 }
 
 function updateCharList() {
@@ -790,7 +733,7 @@ canvas.addEventListener('touchend', e => {
 function handleSwipe(startX, startY, endX, endY) {
   const dx = endX - startX;
   const dy = endY - startY;
-  if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return; // Too short
+  if (Math.abs(dx) < 30 && Math.abs(dy) < 30) return; 
   if (Math.abs(dx) > Math.abs(dy)) {
     if (dx > 0) slide(1, 0); else slide(-1, 0);
   } else {
@@ -798,7 +741,6 @@ function handleSwipe(startX, startY, endX, endY) {
   }
 }
 
-// Cursor styling (Desktop)
 const cursorEl = document.getElementById('cursor');
 document.addEventListener('mousemove', e => {
   cursorEl.style.left = e.clientX + 'px'; cursorEl.style.top  = e.clientY + 'px';

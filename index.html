@@ -4,6 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>「ARCH」 2048 PROTOCOL</title>
+  <link rel="icon" type="image/png" href="「ARCH」 Symbol Logo Black Ver.png">
+  <link rel="apple-touch-icon" href="「ARCH」 Symbol Logo Black Ver.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+KR:wght@300;500;700&display=swap" rel="stylesheet">
@@ -301,6 +303,88 @@
       
       #sys-log { max-height: 150px; }
     }
+
+    /* ── THEME TOGGLE BUTTON ── */
+    #theme-toggle {
+      margin-left: 6px;
+      padding: 5px 11px;
+      background: transparent;
+      border: 1px solid rgba(255,255,255,.35);
+      color: rgba(255,255,255,.75);
+      font-family: var(--font); font-size: 9px; letter-spacing: 2px; font-weight: 700;
+      transition: .2s;
+    }
+    #theme-toggle:hover { background: #fff; color: #000; box-shadow: 0 0 14px rgba(127,127,127,.4); }
+
+    /* ════════════════════════════════════════
+       LIGHT MODE
+       ════════════════════════════════════════ */
+    body { transition: background .3s, color .3s; }
+
+    body.light { background: #f4f4f6; color: #111; }
+    body.light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.3); }
+    body.light #cursor { border-color: #000; box-shadow: 0 0 12px rgba(0,0,0,.3); }
+    body.light #cursor::before, body.light #cursor::after { background: #000; }
+    body.light .scanline {
+      background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,.022) 2px, rgba(0,0,0,.022) 4px);
+    }
+
+    body.light header {
+      background: rgba(255,255,255,.96);
+      border-bottom-color: rgba(0,0,0,.18);
+      box-shadow: 0 0 30px rgba(0,0,0,.05);
+    }
+    body.light .hdr-title { text-shadow: 0 0 18px rgba(0,0,0,.25); }
+    body.light .hdr-sub { color: rgba(0,0,0,.4); }
+    body.light .hdr-right { color: rgba(0,0,0,.5); }
+    body.light .hdr-right span { color: #000; }
+
+    body.light #theme-toggle { border-color: rgba(0,0,0,.3); color: rgba(0,0,0,.7); }
+    body.light #theme-toggle:hover { background: #000; color: #fff; box-shadow: 0 0 14px rgba(0,0,0,.3); }
+
+    body.light .box { border-color: rgba(0,0,0,.15); background: rgba(0,0,0,.025); }
+    body.light .box::after { background: linear-gradient(90deg, transparent, rgba(0,0,0,.4), transparent); }
+    body.light .box-label { color: rgba(0,0,0,.4); }
+    body.light .box-val { text-shadow: 0 0 18px rgba(0,0,0,.2); }
+    body.light .howto { color: rgba(0,0,0,.6); }
+    body.light .howto b { color: #000; }
+
+    body.light .crow.on { border-color: rgba(0,0,0,.15); }
+    body.light .crow.cur { border-color: rgba(0,0,0,.8); box-shadow: 0 0 8px rgba(0,0,0,.2); background: rgba(0,0,0,.05); }
+    body.light .cimg { border-color: rgba(0,0,0,.2); }
+    body.light .crow:not(.on) .cimg { filter: brightness(1) grayscale(1) opacity(.25); }
+    body.light .crow:not(.on) .cname { color: rgba(0,0,0,.25); }
+    body.light .crow:not(.on) .cpts { color: rgba(0,0,0,.12); }
+    body.light .cname { color: rgba(0,0,0,.7); }
+    body.light .cpts { color: rgba(0,0,0,.4); }
+    body.light #sys-log { color: rgba(0,0,0,.5) !important; }
+
+    body.light #gc {
+      border-color: rgba(0,0,0,.35);
+      box-shadow: 0 0 35px rgba(0,0,0,.08), inset 0 0 50px rgba(0,0,0,.04);
+    }
+
+    body.light #capture-btn {
+      border-color: rgba(0,0,0,.4); color: rgba(0,0,0,.7);
+      box-shadow: 0 0 10px rgba(0,0,0,.04);
+    }
+    body.light #capture-btn::before { background: linear-gradient(90deg, transparent, rgba(0,0,0,.25), transparent); }
+    body.light #capture-btn:hover { background: #000; color: #fff; border-color: #000; box-shadow: 0 0 22px rgba(0,0,0,.4); }
+
+    body.light #go-overlay { background: rgba(244,244,246,.94); border-color: rgba(0,0,0,.6); }
+    body.light .go-title { text-shadow: 0 0 25px rgba(0,0,0,.4); }
+    body.light .go-sub { color: rgba(0,0,0,.5); }
+    body.light .go-score { color: rgba(0,0,0,.6); }
+    body.light .go-score span { color: #000; text-shadow: 0 0 15px rgba(0,0,0,.3); }
+    body.light .btn-r { border-color: #000; color: #000; }
+    body.light .btn-r::before { background: linear-gradient(90deg, transparent, rgba(0,0,0,.25), transparent); }
+    body.light .btn-r:hover { background: #000; color: #fff; box-shadow: 0 0 22px rgba(0,0,0,.35); }
+
+    body.light #notif {
+      background: rgba(17,17,17,.96); color: #fff;
+      border-left-color: #fff; box-shadow: 0 8px 28px rgba(0,0,0,.2);
+    }
+    body.light .score-pop { color: #000; text-shadow: 0 0 12px rgba(0,0,0,.3); }
   </style>
 </head>
 <body>
@@ -327,6 +411,7 @@
   <div class="hdr-left">
     <div class="hdr-title">「ARCH」</div>
     <div class="hdr-sub">| 2048_PROTOCOL</div>
+    <button id="theme-toggle" onclick="toggleTheme()">◐ <span id="theme-label">LIGHT</span></button>
   </div>
   <div class="hdr-right">
     SYSTEM: <span>ONLINE</span><br>
@@ -424,6 +509,7 @@ let grid = [];
 let animTiles = []; 
 let score = 0;
 let bestScore = +(localStorage.getItem('arch_2048_best') || 0);
+let lightMode = localStorage.getItem('arch_2048_theme') === 'light';
 let gameOver = false;
 let isAnimating = false;
 let unlocked = new Set([1]); 
@@ -613,7 +699,7 @@ function drawRoundRect(targetCtx, x, y, w, h, r) {
   targetCtx.quadraticCurveTo(x, y, x + r, y); targetCtx.closePath();
 }
 
-function drawSingleTile(targetCtx, t, x, y, size, rad) {
+function drawSingleTile(targetCtx, t, x, y, size, rad, dark = true) {
   const img = imgs[t.id];
   targetCtx.save();
   drawRoundRect(targetCtx, x, y, size, size, rad);
@@ -671,17 +757,17 @@ function drawSingleTile(targetCtx, t, x, y, size, rad) {
   
   targetCtx.save();
   drawRoundRect(targetCtx, x, y, size, size, rad);
-  targetCtx.strokeStyle = 'rgba(255,255,255,.4)'; targetCtx.lineWidth = 1.5; targetCtx.stroke();
-  targetCtx.strokeStyle = 'rgba(255,255,255,.1)'; targetCtx.lineWidth = 4; targetCtx.stroke();
+  targetCtx.strokeStyle = dark ? 'rgba(255,255,255,.4)' : 'rgba(0,0,0,.3)'; targetCtx.lineWidth = 1.5; targetCtx.stroke();
+  targetCtx.strokeStyle = dark ? 'rgba(255,255,255,.1)' : 'rgba(0,0,0,.08)'; targetCtx.lineWidth = 4; targetCtx.stroke();
   targetCtx.restore();
 }
 
 function draw() {
   ctx.clearRect(0, 0, BASE_W, BASE_H);
-  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, BASE_W, BASE_H);
+  ctx.fillStyle = lightMode ? '#e9e9ee' : '#000'; ctx.fillRect(0, 0, BASE_W, BASE_H);
 
-  ctx.fillStyle = 'rgba(255,255,255,.05)';
-  ctx.strokeStyle = 'rgba(255,255,255,.1)';
+  ctx.fillStyle = lightMode ? 'rgba(0,0,0,.04)' : 'rgba(255,255,255,.05)';
+  ctx.strokeStyle = lightMode ? 'rgba(0,0,0,.13)' : 'rgba(255,255,255,.1)';
   ctx.lineWidth = 1;
   for (let r=0; r<SIZE; r++) {
     for (let c=0; c<SIZE; c++) {
@@ -709,7 +795,7 @@ function draw() {
     let rad = 8 * t.scale;
 
     if (t.scale > 0.05) {
-      drawSingleTile(ctx, t, drawX, drawY, drawSize, rad);
+      drawSingleTile(ctx, t, drawX, drawY, drawSize, rad, !lightMode);
     }
   });
 }
@@ -797,6 +883,20 @@ document.addEventListener('mousemove', e => {
 });
 document.addEventListener('mousedown', () => cursorEl.classList.add('click'));
 document.addEventListener('mouseup',   () => cursorEl.classList.remove('click'));
+
+// ── THEME ──
+function applyTheme() {
+  document.body.classList.toggle('light', lightMode);
+  const lbl = document.getElementById('theme-label');
+  if (lbl) lbl.textContent = lightMode ? 'DARK' : 'LIGHT';
+}
+function toggleTheme() {
+  lightMode = !lightMode;
+  localStorage.setItem('arch_2048_theme', lightMode ? 'light' : 'dark');
+  applyTheme();
+  draw();
+  notify(lightMode ? 'LIGHT_MODE_ENGAGED' : 'DARK_MODE_ENGAGED');
+}
 
 // ── CAPTURE ──
 let capturedDataURL = null;
@@ -898,6 +998,7 @@ setInterval(() => { document.getElementById('clock').textContent = new Date().to
 
 // ── BOOT ──
 window.onload = async () => {
+  applyTheme();
   resizeCanvas();
   window.addEventListener('resize', () => { resizeCanvas(); draw(); });
   
